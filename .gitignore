@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local settings and data
+.env
+lyft_prices.db
+scrape_debug/
+
+# Editor/OS
+.vscode/
+.DS_Store
+Thumbs.db

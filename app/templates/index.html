@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="refresh" content="1200" />
+  <title>Lyft + Uber Price Tracker</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #192231;
+      --muted: #5c6d84;
+      --accent: #0c7d69;
+      --danger: #c62828;
+      --border: #d8dfeb;
+    }
+    body {
+      margin: 0;
+      padding: 2rem;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top right, #d9f2ee, #f5f7fb 40%);
+      color: var(--text);
+    }
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 10px 30px rgba(12, 38, 73, 0.07);
+    }
+    h1 {
+      margin: 0 0 0.25rem 0;
+      font-size: 1.9rem;
+    }
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .price {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .muted {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .button-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      background: #1f4a8a;
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .chart-wrap {
+      width: 100%;
+      min-height: 280px;
+    }
+    .shots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+      margin-top: 0.75rem;
+    }
+    .shot {
+      margin-top: 0.6rem;
+      width: 100%;
+      max-width: 420px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: block;
+    }
+    .shot-link {
+      color: #1f4a8a;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .ok {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .bad {
+      color: var(--danger);
+      font-weight: 600;
+    }
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Lyft + Uber Price Tracker</h1>
+      <p class="subtitle">Updated (EST): {{ now }} | Auto-check every {{ settings.check_interval_hours }} hours</p>
+      <div class="stats">
+        <div>
+          <p class="muted">Route</p>
+          <strong>{{ tracker.source_address }} -> {{ tracker.destination_address }}</strong>
+        </div>
+        <div>
+          <p class="muted">Trip Settings</p>
+          <strong>{{ tracker.target_datetime }} | {{ tracker.passengers }} passenger(s)</strong>
+        </div>
+        <div>
+          <p class="muted">Alert Threshold</p>
+          <strong>${{ '%.2f' | format(tracker.price_threshold) }}</strong>
+        </div>
+      </div>
+      <form method="post" action="/settings" style="margin-top:1rem;">
+        <div class="stats">
+          <div>
+            <label class="muted" for="source_address">Source</label>
+            <input id="source_address" name="source_address" type="text" value="{{ tracker.source_address }}" required style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:8px;" />
+          </div>
+          <div>
+            <label class="muted" for="destination_address">Destination</label>
+            <input id="destination_address" name="destination_address" type="text" value="{{ tracker.destination_address }}" required style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:8px;" />
+          </div>
+          <div>
+            <label class="muted" for="target_datetime">Date and Time</label>
+            <input id="target_datetime" name="target_datetime" type="datetime-local" value="{{ tracker.target_datetime }}" required style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:8px;" />
+          </div>
+          <div>
+            <label class="muted" for="passengers">Passengers</label>
+            <input id="passengers" name="passengers" type="number" min="1" value="{{ tracker.passengers }}" required style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:8px;" />
+          </div>
+          <div>
+            <label class="muted" for="price_threshold">Cost Threshold (USD)</label>
+            <input id="price_threshold" name="price_threshold" type="number" min="0" step="0.01" value="{{ tracker.price_threshold }}" required style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:8px;" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit">Save Trip Settings</button>
+        </div>
+      </form>
+      <form method="post" action="/run-check" style="margin-top:1rem;">
+        <div class="actions">
+          <button type="submit">Run Check Now</button>
+          <a class="button-link" href="/export.csv">Download CSV Log</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Latest Successful Estimates</h2>
+      <div class="stats">
+        <div>
+          <p class="muted">Lyft</p>
+          {% if latest_lyft %}
+            <p class="price">${{ '%.2f' | format(latest_lyft.low_estimate) }} - ${{ '%.2f' | format(latest_lyft.high_estimate) }}</p>
+            <p class="muted">Ride type: {{ latest_lyft.ride_type }} | Checked (EST): {{ latest_lyft.checked_at_est }}</p>
+          {% else %}
+            <p class="muted">No successful Lyft checks yet.</p>
+          {% endif %}
+        </div>
+        <div>
+          <p class="muted">Uber</p>
+          {% if latest_uber %}
+            <p class="price">${{ '%.2f' | format(latest_uber.low_estimate) }} - ${{ '%.2f' | format(latest_uber.high_estimate) }}</p>
+            <p class="muted">Ride type: {{ latest_uber.ride_type }} | Checked (EST): {{ latest_uber.checked_at_est }}</p>
+          {% else %}
+            <p class="muted">No successful Uber checks yet.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Latest Price Screenshots</h2>
+      <div class="shots-grid">
+        <div>
+          <p class="muted">Lyft Screenshot</p>
+          {% if latest_lyft and latest_lyft.screenshot_url %}
+            <a class="shot-link" href="{{ latest_lyft.screenshot_url }}" target="_blank">Open full-size</a>
+            <img class="shot" src="{{ latest_lyft.screenshot_url }}" alt="Latest Lyft price screenshot" />
+          {% else %}
+            <p class="muted">No Lyft screenshot available yet.</p>
+          {% endif %}
+        </div>
+        <div>
+          <p class="muted">Uber Screenshot</p>
+          {% if latest_uber and latest_uber.screenshot_url %}
+            <a class="shot-link" href="{{ latest_uber.screenshot_url }}" target="_blank">Open full-size</a>
+            <img class="shot" src="{{ latest_uber.screenshot_url }}" alt="Latest Uber price screenshot" />
+          {% else %}
+            <p class="muted">No Uber screenshot available yet.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Low Estimate Trend (Lyft vs Uber)</h2>
+      {% if lyft_chart_values or uber_chart_values %}
+        <div class="chart-wrap">
+          <canvas id="priceChart"></canvas>
+        </div>
+      {% else %}
+        <p class="muted">Not enough successful checks yet to draw a trend chart.</p>
+      {% endif %}
+    </div>
+
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const labels = {{ chart_labels | tojson }};
+    const lyftValues = {{ lyft_chart_values | tojson }};
+    const uberValues = {{ uber_chart_values | tojson }};
+
+    if (labels.length > 0 && (lyftValues.length > 0 || uberValues.length > 0)) {
+      const ctx = document.getElementById("priceChart");
+      new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Lyft low estimate (USD)",
+              data: lyftValues,
+              borderColor: "#0c7d69",
+              backgroundColor: "rgba(12, 125, 105, 0.15)",
+              fill: true,
+              tension: 0.25,
+              pointRadius: 3,
+            },
+            {
+              label: "Uber low estimate (USD)",
+              data: uberValues,
+              borderColor: "#1f4a8a",
+              backgroundColor: "rgba(31, 74, 138, 0.12)",
+              fill: true,
+              tension: 0.25,
+              pointRadius: 3,
+            },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: (value) => "$" + Number(value).toFixed(0),
+              },
+            },
+          },
+          plugins: {
+            legend: {
+              display: true,
+            },
+          },
+        },
+      });
+    }
+  </script>
+</body>
+</html>
