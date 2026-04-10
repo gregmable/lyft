@@ -16,6 +16,7 @@ env/
 .env
 lyft_prices.db
 scrape_debug/
+scrape_profile/
 
 # Editor/OS
 .vscode/

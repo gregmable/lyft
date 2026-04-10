@@ -164,6 +164,36 @@ def get_latest_successful_check_by_provider(db_path: Path, provider: str) -> dic
     return dict(row) if row else None
 
 
+def get_latest_check_by_provider(db_path: Path, provider: str) -> dict[str, Any] | None:
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM price_checks
+            WHERE provider = ?
+            ORDER BY datetime(checked_at) DESC
+            LIMIT 1
+            """,
+            (provider,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def get_latest_failed_check_by_provider(db_path: Path, provider: str) -> dict[str, Any] | None:
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM price_checks
+            WHERE provider = ? AND success = 0
+            ORDER BY datetime(checked_at) DESC
+            LIMIT 1
+            """,
+            (provider,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def get_tracker_config(db_path: Path) -> dict[str, Any]:
     with _connect(db_path) as conn:
         row = conn.execute(

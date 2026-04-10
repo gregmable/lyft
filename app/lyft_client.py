@@ -67,18 +67,48 @@ class LyftClient:
         except Exception:
             return None
 
+    def _contexts(self, page) -> list:
+        contexts = [page]
+        try:
+            contexts.extend(page.frames)
+        except Exception:
+            pass
+        return contexts
+
     def _fill_first_available(self, page, selectors: list[str], value: str, timeout_ms: int) -> bool:
-        for selector in selectors:
-            try:
-                locator = page.locator(selector).first
-                locator.wait_for(timeout=timeout_ms)
-                locator.fill("")
-                locator.fill(value)
-                locator.press("Enter")
-                return True
-            except Exception:
-                continue
+        for context in self._contexts(page):
+            for selector in selectors:
+                try:
+                    locator = context.locator(selector).first
+                    locator.wait_for(timeout=timeout_ms)
+                    locator.click()
+                    locator.fill("")
+                    locator.fill(value)
+                    try:
+                        locator.press("ArrowDown")
+                    except Exception:
+                        pass
+                    locator.press("Enter")
+                    return True
+                except Exception:
+                    continue
         return False
+
+    def _dismiss_overlays(self, page) -> None:
+        selectors = [
+            "button:has-text('Accept all')",
+            "button:has-text('Accept')",
+            "button:has-text('I agree')",
+            "button[aria-label*='close' i]",
+            "[data-testid*='close' i]",
+        ]
+        for context in self._contexts(page):
+            for selector in selectors:
+                try:
+                    context.locator(selector).first.click(timeout=1200)
+                    page.wait_for_timeout(200)
+                except Exception:
+                    continue
 
     def _collect_candidate_texts(self, page) -> list[str]:
         texts: list[str] = []
@@ -89,17 +119,34 @@ class LyftClient:
             "[data-testid*='fare' i]",
             "[data-testid*='price' i]",
         ]
-        for selector in selectors:
-            try:
-                texts.extend(page.locator(selector).all_inner_texts())
-            except Exception:
-                continue
+        for context in self._contexts(page):
+            for selector in selectors:
+                try:
+                    texts.extend(context.locator(selector).all_inner_texts())
+                except Exception:
+                    continue
 
         try:
             texts.append(page.inner_text("body"))
         except Exception:
             pass
         return texts
+
+    def _detect_blocking_reason(self, page) -> str | None:
+        blob_parts: list[str] = []
+        for context in self._contexts(page):
+            try:
+                blob_parts.append(context.inner_text("body")[:20000])
+            except Exception:
+                continue
+        blob = "\n".join(blob_parts).lower()
+        if "enter your phone" in blob or "phone number" in blob:
+            return "Lyft phone verification gate detected"
+        if "captcha" in blob or "not a robot" in blob or "verify you are human" in blob:
+            return "Lyft anti-bot challenge detected"
+        if "access denied" in blob or "temporarily unavailable" in blob:
+            return "Lyft page access blocked"
+        return None
 
     def get_cost_estimate(self) -> dict[str, Any]:
         try:
@@ -114,19 +161,36 @@ class LyftClient:
 
         for attempt in range(1, retries + 1):
             browser = None
+            context = None
             page = None
             try:
                 with sync_playwright() as playwright:
-                    browser = playwright.chromium.launch(
-                        headless=self.settings.scraper_headless,
-                        slow_mo=max(0, self.settings.scraper_slow_mo_ms),
-                    )
-                    page = browser.new_page()
+                    if self.settings.scraper_use_persistent_context:
+                        profile_dir = self.settings.scraper_profile_dir
+                        profile_dir.mkdir(parents=True, exist_ok=True)
+                        context = playwright.chromium.launch_persistent_context(
+                            user_data_dir=str(profile_dir),
+                            headless=self.settings.scraper_headless,
+                            slow_mo=max(0, self.settings.scraper_slow_mo_ms),
+                            args=["--disable-blink-features=AutomationControlled"],
+                        )
+                        page = context.pages[0] if context.pages else context.new_page()
+                    else:
+                        browser = playwright.chromium.launch(
+                            headless=self.settings.scraper_headless,
+                            slow_mo=max(0, self.settings.scraper_slow_mo_ms),
+                            args=["--disable-blink-features=AutomationControlled"],
+                        )
+                        page = browser.new_page()
                     page.goto(
                         FARE_URL,
                         wait_until="domcontentloaded",
                         timeout=self.settings.scraper_timeout_ms,
                     )
+                    self._dismiss_overlays(page)
+                    blocking_reason = self._detect_blocking_reason(page)
+                    if blocking_reason:
+                        raise RuntimeError(blocking_reason)
 
                     from_ok = self._fill_first_available(
                         page,
@@ -136,6 +200,10 @@ class LyftClient:
                             "input[name*='pickup' i]",
                             "input[placeholder*='from' i]",
                             "input[aria-label*='from' i]",
+                            "input[autocomplete='street-address']",
+                            "input[aria-label*='origin' i]",
+                            "input[placeholder*='origin' i]",
+                            "input[aria-label*='start' i]",
                         ],
                         self.settings.source_address,
                         min(20000, self.settings.scraper_timeout_ms),
@@ -151,6 +219,10 @@ class LyftClient:
                             "input[name*='destination' i]",
                             "input[placeholder*='destination' i]",
                             "input[placeholder*='to' i]",
+                            "input[aria-label*='where to' i]",
+                            "input[placeholder*='where to' i]",
+                            "input[aria-label*='destination' i]",
+                            "input[aria-label*='end' i]",
                         ],
                         self.settings.destination_address,
                         min(20000, self.settings.scraper_timeout_ms),
@@ -189,6 +261,11 @@ class LyftClient:
                 if page is not None:
                     last_screenshot_name = self._capture_failure_artifacts(page, attempt)
             finally:
+                if context is not None:
+                    try:
+                        context.close()
+                    except Exception:
+                        pass
                 if browser is not None:
                     try:
                         browser.close()

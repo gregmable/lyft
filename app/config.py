@@ -34,6 +34,8 @@ class Settings:
     email_to: str
     database_path: Path
     scraper_headless: bool
+    scraper_use_persistent_context: bool
+    scraper_profile_dir: Path
     scraper_slow_mo_ms: int
     scraper_timeout_ms: int
     scraper_retries: int
@@ -78,6 +80,8 @@ def load_settings() -> Settings:
         email_to=os.getenv("EMAIL_TO", ""),
         database_path=Path(os.getenv("DATABASE_PATH", "lyft_prices.db")),
         scraper_headless=_get_bool("SCRAPER_HEADLESS", True),
+        scraper_use_persistent_context=_get_bool("SCRAPER_USE_PERSISTENT_CONTEXT", False),
+        scraper_profile_dir=Path(os.getenv("SCRAPER_PROFILE_DIR", "scrape_profile")),
         scraper_slow_mo_ms=int(os.getenv("SCRAPER_SLOW_MO_MS", "0")),
         scraper_timeout_ms=int(os.getenv("SCRAPER_TIMEOUT_MS", "60000")),
         scraper_retries=int(os.getenv("SCRAPER_RETRIES", "3")),

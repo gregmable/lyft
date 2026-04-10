@@ -80,11 +80,19 @@ After startup, you can edit route/trip inputs directly in the dashboard. Those v
 Set these optional values in `.env` to tune scraping behavior:
 
 - `SCRAPER_HEADLESS=true|false`
+- `SCRAPER_USE_PERSISTENT_CONTEXT=true|false` (recommended `true` when providers gate headless sessions)
+- `SCRAPER_PROFILE_DIR=scrape_profile` (browser profile/cache directory used for persistent context)
 - `SCRAPER_SLOW_MO_MS=0` (increase for slower, more human-like interactions)
 - `SCRAPER_TIMEOUT_MS=60000`
 - `SCRAPER_RETRIES=3`
 - `SCRAPER_DEBUG_DIR=scrape_debug`
 - The app performs one initial check a few seconds after startup, then follows the interval.
+
+For improved direct scraping reliability on Lyft/Uber, try this combination:
+
+- `SCRAPER_HEADLESS=false`
+- `SCRAPER_USE_PERSISTENT_CONTEXT=true`
+- `SCRAPER_SLOW_MO_MS=150`
 
 ## Windows Auto-Start (Task Scheduler)
 
@@ -110,6 +118,8 @@ Create a true system-startup trigger (may require elevated PowerShell):
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\register-task.ps1 -TaskName "LyftPriceTracker" -AtStartup
 ```
+
+If elevation is not available, the script now falls back automatically to an `AtLogOn` trigger for the current user and prints a warning.
 
 Optional explicit Python path:
 

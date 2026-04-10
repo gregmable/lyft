@@ -116,6 +116,30 @@
       color: var(--danger);
       font-weight: 600;
     }
+    .tag {
+      display: inline-block;
+      margin-top: 0.35rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .tag-web {
+      color: #0b5f4f;
+      background: #d6efe9;
+      border: 1px solid #9ed4c7;
+    }
+    .tag-recovered {
+      color: #8a5a00;
+      background: #ffefc2;
+      border: 1px solid #f2cc73;
+    }
+    .tag-fallback {
+      color: #8b1f1f;
+      background: #ffe2df;
+      border: 1px solid #efb5af;
+    }
     @media (max-width: 640px) {
       body { padding: 1rem; }
     }
@@ -183,6 +207,14 @@
           {% if latest_lyft %}
             <p class="price">${{ '%.2f' | format(latest_lyft.low_estimate) }} - ${{ '%.2f' | format(latest_lyft.high_estimate) }}</p>
             <p class="muted">Ride type: {{ latest_lyft.ride_type }} | Checked (EST): {{ latest_lyft.checked_at_est }}</p>
+            {% set lyft_type = (latest_lyft.ride_type or '') | lower %}
+            {% if 'auto-fix fallback' in lyft_type or '(fallback)' in lyft_type %}
+              <span class="tag tag-fallback">Fallback Model</span>
+            {% elif 'auto-recovered' in lyft_type %}
+              <span class="tag tag-recovered">Recovered After Retry</span>
+            {% else %}
+              <span class="tag tag-web">Direct Web Quote</span>
+            {% endif %}
           {% else %}
             <p class="muted">No successful Lyft checks yet.</p>
           {% endif %}
@@ -192,8 +224,69 @@
           {% if latest_uber %}
             <p class="price">${{ '%.2f' | format(latest_uber.low_estimate) }} - ${{ '%.2f' | format(latest_uber.high_estimate) }}</p>
             <p class="muted">Ride type: {{ latest_uber.ride_type }} | Checked (EST): {{ latest_uber.checked_at_est }}</p>
+            {% set uber_type = (latest_uber.ride_type or '') | lower %}
+            {% if 'auto-fix fallback' in uber_type or '(fallback)' in uber_type %}
+              <span class="tag tag-fallback">Fallback Model</span>
+            {% elif 'auto-recovered' in uber_type %}
+              <span class="tag tag-recovered">Recovered After Retry</span>
+            {% else %}
+              <span class="tag tag-web">Direct Web Quote</span>
+            {% endif %}
           {% else %}
             <p class="muted">No successful Uber checks yet.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Latest Run Status & Error Recovery</h2>
+      <div class="stats">
+        <div>
+          <p class="muted">Lyft</p>
+          {% if latest_lyft_check %}
+            {% if latest_lyft_check.success %}
+              <p class="ok">Latest run succeeded</p>
+              <p class="muted">Checked (EST): {{ latest_lyft_check.checked_at_est }} | Ride type: {{ latest_lyft_check.ride_type }}</p>
+            {% else %}
+              <p class="bad">Latest run failed</p>
+              <p class="muted">Checked (EST): {{ latest_lyft_check.checked_at_est }}</p>
+              {% if latest_lyft_check.error_code %}
+                <p class="muted">Code: {{ latest_lyft_check.error_code }}</p>
+              {% endif %}
+              <p class="muted">Error: {{ latest_lyft_check.error_message or 'Unknown error' }}</p>
+              <p class="muted">Auto-fix attempts: extended-timeout retry and fallback fare model.</p>
+            {% endif %}
+          {% else %}
+            <p class="muted">No Lyft checks yet.</p>
+          {% endif %}
+
+          {% if latest_failed_lyft %}
+            <p class="muted" style="margin-top:0.5rem;">Most recent Lyft failure: {{ latest_failed_lyft.checked_at_est }}</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <p class="muted">Uber</p>
+          {% if latest_uber_check %}
+            {% if latest_uber_check.success %}
+              <p class="ok">Latest run succeeded</p>
+              <p class="muted">Checked (EST): {{ latest_uber_check.checked_at_est }} | Ride type: {{ latest_uber_check.ride_type }}</p>
+            {% else %}
+              <p class="bad">Latest run failed</p>
+              <p class="muted">Checked (EST): {{ latest_uber_check.checked_at_est }}</p>
+              {% if latest_uber_check.error_code %}
+                <p class="muted">Code: {{ latest_uber_check.error_code }}</p>
+              {% endif %}
+              <p class="muted">Error: {{ latest_uber_check.error_message or 'Unknown error' }}</p>
+              <p class="muted">Auto-fix attempts: extended-timeout retry and fallback fare model.</p>
+            {% endif %}
+          {% else %}
+            <p class="muted">No Uber checks yet.</p>
+          {% endif %}
+
+          {% if latest_failed_uber %}
+            <p class="muted" style="margin-top:0.5rem;">Most recent Uber failure: {{ latest_failed_uber.checked_at_est }}</p>
           {% endif %}
         </div>
       </div>

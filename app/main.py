@@ -13,6 +13,8 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Settings, load_settings
 from app.database import (
+    get_latest_check_by_provider,
+    get_latest_failed_check_by_provider,
     get_latest_successful_check_by_provider,
     get_recent_checks,
     get_tracker_config,
@@ -53,6 +55,15 @@ def _format_est_compact(value: str) -> str:
 
     eastern = dt.astimezone(ZoneInfo("America/New_York"))
     return eastern.strftime("%m/%d %I:%M %p")
+
+
+def _extract_error_code(error_message: str | None) -> str | None:
+    if not error_message:
+        return None
+    message = error_message.strip()
+    if message.startswith("[") and "]" in message:
+        return message[1 : message.index("]")].strip()
+    return None
 
 
 def _default_tracker_config() -> dict:
@@ -105,11 +116,16 @@ def dashboard(request: Request):
     checks = get_recent_checks(settings.database_path, limit=200)
     latest_lyft = get_latest_successful_check_by_provider(settings.database_path, "lyft")
     latest_uber = get_latest_successful_check_by_provider(settings.database_path, "uber")
+    latest_lyft_check = get_latest_check_by_provider(settings.database_path, "lyft")
+    latest_uber_check = get_latest_check_by_provider(settings.database_path, "uber")
+    latest_failed_lyft = get_latest_failed_check_by_provider(settings.database_path, "lyft")
+    latest_failed_uber = get_latest_failed_check_by_provider(settings.database_path, "uber")
     tracker_config = get_tracker_config(settings.database_path)
     checks_display = []
     for row in checks:
         row_copy = dict(row)
         row_copy["checked_at_est"] = _format_est(str(row.get("checked_at", "")))
+        row_copy["error_code"] = _extract_error_code(row_copy.get("error_message"))
         screenshot_name = row_copy.get("screenshot_path")
         row_copy["screenshot_url"] = f"/screenshots/{screenshot_name}" if screenshot_name else None
         checks_display.append(row_copy)
@@ -125,6 +141,26 @@ def dashboard(request: Request):
         latest_uber_display["checked_at_est"] = _format_est(str(latest_uber_display.get("checked_at", "")))
         screenshot_name = latest_uber_display.get("screenshot_path")
         latest_uber_display["screenshot_url"] = f"/screenshots/{screenshot_name}" if screenshot_name else None
+
+    latest_lyft_check_display = dict(latest_lyft_check) if latest_lyft_check else None
+    if latest_lyft_check_display:
+        latest_lyft_check_display["checked_at_est"] = _format_est(str(latest_lyft_check_display.get("checked_at", "")))
+        latest_lyft_check_display["error_code"] = _extract_error_code(latest_lyft_check_display.get("error_message"))
+
+    latest_uber_check_display = dict(latest_uber_check) if latest_uber_check else None
+    if latest_uber_check_display:
+        latest_uber_check_display["checked_at_est"] = _format_est(str(latest_uber_check_display.get("checked_at", "")))
+        latest_uber_check_display["error_code"] = _extract_error_code(latest_uber_check_display.get("error_message"))
+
+    latest_failed_lyft_display = dict(latest_failed_lyft) if latest_failed_lyft else None
+    if latest_failed_lyft_display:
+        latest_failed_lyft_display["checked_at_est"] = _format_est(str(latest_failed_lyft_display.get("checked_at", "")))
+        latest_failed_lyft_display["error_code"] = _extract_error_code(latest_failed_lyft_display.get("error_message"))
+
+    latest_failed_uber_display = dict(latest_failed_uber) if latest_failed_uber else None
+    if latest_failed_uber_display:
+        latest_failed_uber_display["checked_at_est"] = _format_est(str(latest_failed_uber_display.get("checked_at", "")))
+        latest_failed_uber_display["error_code"] = _extract_error_code(latest_failed_uber_display.get("error_message"))
 
     lyft_rows = [
         row
@@ -157,6 +193,10 @@ def dashboard(request: Request):
             "checks": checks_display,
             "latest_lyft": latest_lyft_display,
             "latest_uber": latest_uber_display,
+            "latest_lyft_check": latest_lyft_check_display,
+            "latest_uber_check": latest_uber_check_display,
+            "latest_failed_lyft": latest_failed_lyft_display,
+            "latest_failed_uber": latest_failed_uber_display,
             "chart_labels": chart_labels,
             "lyft_chart_values": lyft_chart_values,
             "uber_chart_values": uber_chart_values,
