@@ -96,10 +96,25 @@ Register task:
 powershell -ExecutionPolicy Bypass -File .\scripts\register-task.ps1
 ```
 
+By default, the scripts auto-detect and use `.venv\Scripts\python.exe` if present.
+By default, the task is created for your user and runs at logon (no admin required).
+
 Custom task name / host / port:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\register-task.ps1 -TaskName "LyftPriceTracker" -Host "127.0.0.1" -Port 8000
+powershell -ExecutionPolicy Bypass -File .\scripts\register-task.ps1 -TaskName "LyftPriceTracker" -BindHost "127.0.0.1" -Port 8000
+```
+
+Create a true system-startup trigger (may require elevated PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\register-task.ps1 -TaskName "LyftPriceTracker" -AtStartup
+```
+
+Optional explicit Python path:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\register-task.ps1 -PythonExe ".\.venv\Scripts\python.exe"
 ```
 
 Remove task:
